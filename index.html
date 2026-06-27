@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jonli Ovozli Tarjimon</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #74ebd5, #9face6);
+            display: flex;
+            justify-content: center;
+            align-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 400px;
+        }
+        h1 { color: #4a4a4a; margin-bottom: 20px; }
+        .btn {
+            background-color: #ff4757;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 18px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: 0.3s;
+            box-shadow: 0 5px 15px rgba(255, 71, 87, 0.4);
+        }
+        .btn:hover { background-color: #e84118; transform: scale(1.05); }
+        .btn.recording { background-color: #2ed573; box-shadow: 0 5px 15px rgba(46, 213, 115, 0.4); }
+        .result-box {
+            margin-top: 25px;
+            text-align: left;
+            background: #f1f2f6;
+            padding: 15px;
+            border-radius: 10px;
+            min-height: 80px;
+        }
+        .status { font-weight: bold; color: #57606f; margin-bottom: 10px; }
+        p { margin: 5px 0; color: #2f3542; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Jonli Tarjimon</h1>
+    <p style="color: #747d8c; margin-bottom: 25px;">Tugmani bosing va o'zbekcha gapiring</p>
+
+    <button id="micBtn" class="btn">🎤 Gapirishni boshlash</button>
+
+    <div class="result-box">
+        <div id="status" class="status">Kutish rejimi...</div>
+        <p id="originalText"><b>Siz:</b> -</p>
+        <p id="translatedText"><b>Tarjima:</b> -</p>
+    </div>
+</div>
+
+<script>
+    const micBtn = document.getElementById('micBtn');
+    const statusDiv = document.getElementById('status');
+    const originalText = document.getElementById('originalText');
+    const translatedText = document.getElementById('translatedText');
+
+    // Brauzer ovozni aniqlash tizimi (Speech Recognition)
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+        alert("Kechirasiz, brauzeringiz ovoz eshitishni qo'llab-quvvatlamaydi. Google Chrome'dan foydalaning.");
+    } else {
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'uz-UZ'; // O'zbek tili
+        recognition.interimResults = false;
+
+        let isRecording = false;
+
+        micBtn.addEventListener('click', () => {
+            if (!isRecording) {
+                recognition.start();
+            } else {
+                recognition.stop();
+            }
+        });
+
+        recognition.onstart = () => {
+            isRecording = true;
+            micBtn.textContent = "🛑 To'xtatish";
+            micBtn.classList.add('recording');
+            statusDiv.textContent = "Sizni eshityapman...";
+        };
+
+        recognition.onend = () => {
+            isRecording = false;
+            micBtn.textContent = "🎤 Gapirishni boshlash";
+            micBtn.classList.remove('recording');
+        };
+
+        recognition.onresult = async (event) => {
+            const speechToText = event.results[0][0].transcript;
+            originalText.innerHTML = `<b>Siz:</b> ${speechToText}`;
+            statusDiv.textContent = "Tarjima qilinmoqda...";
+
+            // Backend API ga so'rov yuborish
+            try {
+                const response = await fetch(`http://127.0.0.1:8000/translate?text=${encodeURIComponent(speechToText)}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    translatedText.innerHTML = `<b>Tarjima:</b> ${data.translation}`;
+                    statusDiv.textContent = "Muvaffaqiyatli!";
+
+                    // Kelgan audioni yangratish (Ovozli qaytarish)
+                    const audio = new Audio(data.audio_url + '?cb=' + new Date().getTime());
+                    audio.play();
+                } else {
+                    statusDiv.textContent = "Xatolik yuz berdi.";
+                }
+            } catch (error) {
+                console.error(error);
+                statusDiv.textContent = "Serverga ulanib bo'lmadi.";
+            }
+        };
+    }
+</script>
+
+</body>
+</html>
