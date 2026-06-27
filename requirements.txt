@@ -1,6 +1,4 @@
 streamlit
-streamlit-webrtc
+streamlit-mic-recorder
 deep-translator
 SpeechRecognition
-pydub
-numpy
