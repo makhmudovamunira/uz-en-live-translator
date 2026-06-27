@@ -1,5 +1,6 @@
 streamlit
 streamlit-webrtc
 deep-translator
-gTTS
 SpeechRecognition
+pydub
+numpy
