@@ -1,38 +1,62 @@
 import streamlit as st
+from streamlit_webrtc import webrtc_streamer, WebRtcMode
+import speech_recognition as sr
 from deep_translator import GoogleTranslator
-from gtts import gTTS
-import os
+import queue
 
-# Sahifa sarlavhasi va dizayni
-st.set_page_config(page_title="Jonli Tarjimon", page_icon="🎤", layout="centered")
+st.set_page_config(page_title="Jonli Stream Tarjimon", page_icon="🔊")
+st.title("🔊 Haqiqiy Jonli Ovozli Tarjimon")
+st.write("Mikrofonni yoqing va to'xtamasdan gapiring. Dastur sizni jonli eshitib, tarjima qiladi.")
 
-st.title("🎤 Jonli Ovozli Tarjimon")
-st.write("Matnni kiriting yoki quyidagi maydonga yozing (O'zbekcha -> Inglizcha):")
+# Ovoz bo'laklarini yig'ish uchun navbat (Queue)
+if "audio_queue" not in st.session_state:
+    st.session_state.audio_queue = queue.Queue()
 
-# Foydalanuvchidan matn qabul qilish
-# (Eslatma: Streamlit Cloud serverida mikrofon bilan jonli ishlash uchun qo'shimcha komponentlar kerak,
-# shuning uchun veb-versiyada matnli va ovozli tarjima eng barqaror yo'ldir)
-matn = st.text_area("O'zbekcha matn:", placeholder="Bu yerga biror narsa yozing...")
+# Ovozni aniqlovchi obyekt
+recognizer = sr.Recognizer()
 
-if st.button("Tarjima qilish va Ovozlashtirish", type="primary"):
-    if matn.strip() != "":
-        with st.spinner("Tarjima qilinmoqda..."):
-            try:
-                # 1. Tarjima
-                tarjima = GoogleTranslator(source='uz', target='en').translate(matn)
+# WebRTC komponenti - Brauzer mikrofonidan jonli audio oqimini oladi
+webrtc_ctx = webrtc_streamer(
+    key="speech-to-text",
+    mode=WebRtcMode.SENDONLY,
+    audio_receiver_size=1024,
+    media_stream_constraints={"video": False, "audio": True},
+)
 
-                # 2. Natijalarni ko'rsatish
-                st.success(f"**Tarjima (Inglizcha):** {tarjima}")
+# Agar mikrofon ulangan va ishlayotgan bo'lsa
+if webrtc_ctx.state.playing:
+    status_placeholder = st.empty()
+    status_placeholder.info("Jonli eshitish rejimi faol... Gapiring!")
 
-                # 3. Ovozga aylantirish
-                tts = gTTS(text=tarjima, lang='en', slow=False)
-                audio_fayl = "translation.mp3"
-                tts.save(audio_fayl)
+    original_placeholder = st.empty()
+    translation_placeholder = st.empty()
 
-                # Audio pleyerni ekranga chiqarish
-                st.audio(audio_fayl, format="audio/mp3")
+    # Audio resiverdan ma'lumotlarni o'qiymiz
+    audio_receiver = webrtc_ctx.audio_receiver
+    if audio_receiver:
+        try:
+            audio_frames = audio_receiver.get_frames()
+            if len(audio_frames) > 0:
+                # Ovoz bo'laklarini yagona obyektga yig'amiz
+                all_audio = b"".join([frame.to_ndarray().tobytes() for frame in audio_frames])
 
-            except Exception as e:
-                st.error(f"Xatolik yuz berdi: {e}")
-    else:
-        st.warning("Iltimos, avval matn kiriting!")
+                # Audio ma'lumotni SpeechRecognition tushunadigan formatga keltiramiz
+                audio_data = sr.AudioData(all_audio, sample_rate=48000, sample_width=2)
+
+                # Jonli matnga o'girish (O'zbekcha)
+                text = recognizer.recognize_google(audio_data, language="uz-UZ")
+
+                if text:
+                    original_placeholder.markdown(f"**Siz aytdingiz (Jonli):** {text}")
+
+                    # Jonli tarjima qilish (Inglizchaga)
+                    tarjima = GoogleTranslator(source='uz', target='en').translate(text)
+                    translation_placeholder.markdown(f"**Tarjima (Jonli):** {tarjima}")
+
+        except sr.UnknownValueError:
+            # Ovoz aniq bo'lmasa yoki qisqa bo'lsa xato bermasligi uchun o'tkazib yuboramiz
+            pass
+        except Exception as e:
+            st.error(f"Xatolik: {e}")
+else:
+    st.write("Mikrofon o'chiq. Boshlash uchun 'Start' tugmasini bosing.")
