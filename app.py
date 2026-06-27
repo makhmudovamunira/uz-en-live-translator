@@ -16,13 +16,17 @@ if "audio_queue" not in st.session_state:
 recognizer = sr.Recognizer()
 
 # WebRTC komponenti - Brauzer mikrofonidan jonli audio oqimini oladi
+RTC_CONFIGURATION = {
+    "iceServers": [{"urls": ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"]}]
+}
+
 webrtc_ctx = webrtc_streamer(
     key="speech-to-text",
     mode=WebRtcMode.SENDONLY,
     audio_receiver_size=1024,
+    rtc_configuration=RTC_CONFIGURATION, # STUN serverni ulash
     media_stream_constraints={"video": False, "audio": True},
 )
-
 # Agar mikrofon ulangan va ishlayotgan bo'lsa
 if webrtc_ctx.state.playing:
     status_placeholder = st.empty()
