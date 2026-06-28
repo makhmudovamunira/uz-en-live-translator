@@ -1,58 +1,107 @@
+# import streamlit as st
+# from streamlit_mic_recorder import mic_recorder
+# import speech_recognition as sr
+# from deep_translator import GoogleTranslator
+# from pydub import AudioSegment
+# import io
+#
+# st.set_page_config(page_title="Jonli Ovozli Tarjimon", page_icon="🎤")
+#
+# st.title("🎤 Mukammal Ovozli Tarjimon")
+# st.write("Quyidagi tugmani bosing, gapiring va 'Stop' tugmasini bosing.")
+#
+# # Ovozni aniqlovchi obyekt
+# recognizer = sr.Recognizer()
+#
+# # Mikrofondan yozish tugmasi
+# audio = mic_recorder(
+#     start_prompt="🎤 Gapirishni boshlash",
+#     stop_prompt="🛑 To'xtatish",
+#     just_once=True,
+#     use_container_width=True,
+#     callback=None
+# )
+#
+# # Agar ovoz muvaffaqiyatli yozib bo'lingan bo'lsa
+# if audio:
+#     with st.spinner("Ovoz tahlil qilinmoqda va tarjima qilinmoqda..."):
+#         try:
+#             # 1. Audio baytlarni olish
+#             audio_bytes = audio['bytes']
+#
+#             # 2. Pydub orqali audioni standart WAV formatiga o'tkazish
+#             audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
+#             wav_io = io.BytesIO()
+#             audio_segment.export(wav_io, format="wav")
+#             wav_io.seek(0)
+#
+#             # 3. SpeechRecognition formatiga o'tkazish
+#             with sr.AudioFile(wav_io) as source:
+#                 audio_data = recognizer.record(source)
+#
+#                 # 4. Ovozni Google API orqali matnga o'girish
+#                 text = recognizer.recognize_google(audio_data, language="uz-UZ")
+#
+#                 if text:
+#                     st.audio(audio_bytes, format="audio/wav")  # Ovozni qayta eshitish
+#
+#                     st.subheader("Siz aytdingiz:")
+#                     st.info(text)
+#
+#                     # 5. Ingliz tiliga tarjima qilish
+#                     tarjima = GoogleTranslator(source='uz', target='en').translate(text)
+#
+#                     st.subheader("Inglizcha tarjimasi:")
+#                     st.success(tarjima)
+#
+#         except sr.UnknownValueError:
+#             st.error("Ovozingizni aniqlab bo'lmadi. Iltimos, balandroq va aniqroq gapiring.")
+#         except Exception as e:
+#             st.error(f"Xatolik yuz berdi: {e}")
+
+
+
 import streamlit as st
-from streamlit_mic_recorder import mic_recorder
-import speech_recognition as sr
 from deep_translator import GoogleTranslator
-from gtts import gTTS  # Yangi kutubxona
-import io
+from gtts import gTTS
+import os
 
-st.set_page_config(page_title="Jonli Ovozli Tarjimon", page_icon="🎤")
+# Sahifa sozlamalari
+st.set_page_config(page_title="Matnli va Ovozli Tarjimon", page_icon="📝")
 
-st.title("🎤 Mukammal Ovozli Tarjimon")
-st.write("Quyidagi tugmani bosing, gapiring va 'Stop' tugmasini bosing.")
+st.title("📝 Matnli va Ovozli Tarjimon")
+st.write("O'zbekcha matn kiriting, biz uni inglizchaga tarjima qilib, ovozli qilib beramiz!")
 
-recognizer = sr.Recognizer()
+# 1. Foydalanuvchidan matn qabul qilish (FastAPI dagi text parametre o'rniga)
+user_text = st.text_area("O'zbekcha matnni kiriting:", placeholder="Masalan: Salom, bugun havo juda chiroyli...")
 
-audio = mic_recorder(
-    start_prompt="🎤 Gapirishni boshlash",
-    stop_prompt="🛑 To'xtatish",
-    just_once=True,
-    use_container_width=True,
-    callback=None
-)
+# Tarjima tugmasi
+if st.button("Tarjima qilish ✨", use_container_width=True):
+    if user_text.strip() == "":
+        st.warning("Iltimos, biror matn kiriting!")
+    else:
+        with st.spinner("Tarjima qilinmoqda va audio yaratilmoqda..."):
+            try:
+                # 2. Matnni ingliz tiliga tarjima qilish
+                translated_text = GoogleTranslator(source='uz', target='en').translate(user_text)
 
-if audio:
-    with st.spinner("Ovoz tahlil qilinmoqda va tarjima qilinmoqda..."):
-        try:
-            audio_bytes = audio['bytes']
-            audio_data = sr.AudioData(audio_bytes, sample_rate=44100, sample_width=2)
-
-            # 1. Ovozni matnga o'girish
-            text = recognizer.recognize_google(audio_data, language="uz-UZ")
-
-            if text:
-                st.subheader("Siz aytdingiz:")
-                st.info(text)
-
-                # 2. Ingliz tiliga tarjima qilish
-                tarjima = GoogleTranslator(source='uz', target='en').translate(text)
+                # Natijalarni ekranga chiqarish
+                st.subheader("Original matn:")
+                st.info(user_text)
 
                 st.subheader("Inglizcha tarjimasi:")
-                st.success(tarjima)
+                st.success(translated_text)
 
-                # --- YANGI QISM: Matnni ovozga aylantirish (TTS) ---
-                # Tarjimani ingliz tilida (lang='en') ovozli faylga aylantiramiz
-                tts = gTTS(text=tarjima, lang='en', slow=False)
+                # 3. Tarjimani audio (MP3) faylga aylantirish
+                audio_path = "output.mp3"
+                tts = gTTS(text=translated_text, lang='en', slow=False)
+                tts.save(audio_path)
 
-                # Ovozni xotiraga bayt ko'rinishida yozamiz
-                tts_audio_buffer = io.BytesIO()
-                tts.write_to_fp(tts_audio_buffer)
-                tts_audio_buffer.seek(0)
+                # 4. Audioni pleyerda chiqarish (FastAPI dagi /audio endpointi o'rniga)
+                if os.path.exists(audio_path):
+                    st.subheader("🔊 Ovozli ijro:")
+                    with open(audio_path, "rb") as audio_file:
+                        st.audio(audio_file.read(), format="audio/mp3")
 
-                # Ovozli tarjimani pleyerda chiqarish va avtomatik chalish
-                st.subheader("🔊 Ovozli tarjima:")
-                st.audio(tts_audio_buffer, format="audio/mp3")
-
-        except sr.UnknownValueError:
-            st.error("Ovozingizni aniqlab bo'lmadi. Iltimos, balandroq va aniqroq gapiring.")
-        except Exception as e:
-            st.error(f"Xatolik yuz berdi: {e}")
+            except Exception as e:
+                st.error(f"Xatolik yuz berdi: {e}")
