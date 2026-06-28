@@ -1,3 +1,18 @@
+# Terminalda: pip install pydub
+from pydub import AudioSegment
+import io
+
+# Audio baytlarni pydub orqali WAV ga o'tkazish
+audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
+wav_io = io.BytesIO()
+audio_segment.export(wav_io, format="wav")
+wav_io.seek(0)
+
+# Keyin esa siz yozgan eski kod:
+with sr.AudioFile(wav_io) as source:
+    audio_data = recognizer.record(source)
+
+
 import streamlit as st
 from streamlit_mic_recorder import mic_recorder
 import speech_recognition as sr
