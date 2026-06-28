@@ -1,4 +1,5 @@
 streamlit
 streamlit-mic-recorder
-deep-translator
 SpeechRecognition
+deep-translator
+pydub
